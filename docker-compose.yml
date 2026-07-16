@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: findadvisor_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: findadvisor
+      POSTGRES_PASSWORD: findadvisor
+      POSTGRES_DB: findadvisor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U findadvisor -d findadvisor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: findadvisor_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      LOG_JSON: "true"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-CHANGE_ME_IN_PRODUCTION}
+      DATABASE_URL: postgresql+psycopg2://findadvisor:findadvisor@postgres:5432/findadvisor
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      FASTEMBED_CACHE_PATH: /app/.fastembed_cache
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000","http://localhost"]'
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head && (python -m app.rag.ingest || echo 'RAG ingestion failed - continuing without it, retry later with: docker compose exec backend python -m app.rag.ingest') && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: findadvisor_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: findadvisor_jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4318:4318"   # OTLP HTTP receiver
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: findadvisor_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
