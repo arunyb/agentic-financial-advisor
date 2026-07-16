@@ -7,18 +7,18 @@ this is an educational/demo project.
 ## Architecture
 
 ```
-                     ┌─────────────────────────────────────┐
+                     ┌──────────────────────────────────────┐
                      │              Orchestrator            │
-                     └───────────────────┬───────────────────┘
+                     └────────────────────┬─────────────────┘
                                           │
-                 ┌────────────┬──────────┼──────────┬──────────────┐
-                 ▼            ▼          ▼          ▼              │
+                 ┌────────────┬───────────┼──────────┬──────────────┐
+                 ▼            ▼          ▼          ▼               │
              Planner   Portfolio Agent  Risk Agent  Recommendation  │
              (Groq)    (deterministic) (deterministic)  Agent       │
                                                       (Groq + RAG)  │
-                                                          │          │
-                                                          ▼          │
-                                              pgvector similarity ───┘
+                                                          │         │
+                                                          ▼         │
+                                              pgvector similarity ──┘
                                               search over document
                                               chunks (fund fact sheets,
                                               risk glossary, market notes)
@@ -41,7 +41,7 @@ this is an educational/demo project.
 
 ## Tech stack
 
-| Layer          | Choice                                                        |
+| Layer          | Choice                                                         |
 |----------------|----------------------------------------------------------------|
 | Backend        | FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2                  |
 | Auth           | JWT (access + refresh), bcrypt password hashing                |
@@ -232,6 +232,3 @@ Add a new agent in `backend/app/agents/`, register it in
 `app/agents/orchestrator.py`'s `_AGENT_REGISTRY`, and update the Planner's
 system prompt (`app/agents/planner.py`) to describe when it should run.
 
-## Pushing this to GitHub
-
-See `GITHUB_SETUP.md` for the exact commands.
